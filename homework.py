@@ -36,6 +36,8 @@ HOMEWORK_VERDICTS = {
     'rejected': 'Работа проверена: у ревьюера есть замечания.'
 }
 
+old_status = ''
+
 
 def check_tokens():
     """Проверка доступа к переменным окружения."""
@@ -56,7 +58,7 @@ def send_message(bot, message):
         logging.debug(message)
     except TelegramError as error:
         message = f'Сбой при попытке отправить сообщение: {error}'
-        logging.error(message)
+        raise TelegramError(message)
 
 
 def get_api_answer(timestamp):
@@ -118,6 +120,19 @@ def parse_status(homework):
         raise ParsingError(message)
 
 
+def check_status(bot, message):
+    """Проверка статуса и отправка сообщения."""
+    global old_status
+    try:
+        if old_status != message:
+            send_message(bot, message)
+            old_status = message
+    except TelegramError as error:
+        message = f'Сбой при попытке отправить сообщение: {error}'
+        logging.error(message)
+        raise TelegramError(message)
+
+
 def main():
     """Основная логика работы бота."""
     if check_tokens():
@@ -142,18 +157,8 @@ def main():
             if old_status != message:
                 send_message(bot, message)
                 old_status = message
-        except ParsingError as error:
-            message = f'Сбой при парсинге: {error}'
-            logging.error(message)
-        except TypeError as error:
-            message = (
-                'Сбой при попытке проверить json-данные '
-                f'на соответствие документации: {error}'
-            )
-            logger.error(message)
-        except GetDataError as error:
-            message = f'Сбой при попытке получения данных: {error}.'
-            logging.error(message)
+        except TelegramError as error:
+            logging.error(error)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             if old_status != message:
