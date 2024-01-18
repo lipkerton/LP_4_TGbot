@@ -40,9 +40,9 @@ HOMEWORK_VERDICTS = {
 def check_tokens():
     """Проверка доступа к переменным окружения."""
     return all([
-        PRACTICUM_TOKEN is not None,
-        TELEGRAM_CHAT_ID is not None,
-        TELEGRAM_TOKEN is not None
+        PRACTICUM_TOKEN,
+        TELEGRAM_CHAT_ID,
+        TELEGRAM_TOKEN
     ])
 
 
@@ -101,7 +101,7 @@ def check_response(response):
         return response['homeworks']
     except Exception as error:
         message = (
-            f'Сбой при попытке проверить json-данные '
+            'Сбой при попытке проверить json-данные '
             f'на соответствие документации: {error}'
         )
         raise TypeError(message)
@@ -128,14 +128,20 @@ def main():
         logging.critical(message)
         sys.exit()
     bot = Bot(token=TELEGRAM_TOKEN)
-    timestamp = int(dt.timestamp() - RETRY_PERIOD)
+    timestamp = 0
+    old_status = ''
     while True:
         try:
             get_data = get_api_answer(timestamp)
-            homeworks_list = check_response(get_data)
-            if homeworks_list:
-                message = parse_status(homeworks_list[0])
+            timestamp = get_data.get('current_date', timestamp)
+            homeworks = check_response(get_data)
+            if homeworks:
+                message = parse_status(homeworks[0])
+            else:
+                message = 'Новых статусов нет.'
+            if old_status != message:
                 send_message(bot, message)
+                old_status = message
         except ParsingError as error:
             message = f'Сбой при парсинге: {error}'
             logging.error(message)
@@ -150,6 +156,9 @@ def main():
             logging.error(message)
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
+            if old_status != message:
+                send_message(bot, message)
+                old_status = message
             logging.error(message)
         finally:
             time.sleep(RETRY_PERIOD)
